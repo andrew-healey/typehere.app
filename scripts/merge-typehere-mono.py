@@ -82,6 +82,8 @@ def import_glyph(
     cell_width: int,
     upm_scale: float,
     y_center: float,
+    *,
+    preserve_donor_metrics: bool = False,
 ) -> str | None:
     category = unicodedata.category(chr(codepoint))
     if category in SKIP_CATEGORIES:
@@ -120,15 +122,24 @@ def import_glyph(
         return None
 
     xmin, ymin, xmax, ymax = bounds
-    width = xmax - xmin
-    max_width = cell_width * MAX_FILL
-    if width > max_width:
-        scale *= max_width / width
+    if preserve_donor_metrics:
+        donor_advance, donor_lsb = donor["hmtx"][donor_glyph_name]
+        advance = round(donor_advance * upm_scale)
+        lsb = round(donor_lsb * upm_scale)
+        tx = lsb - xmin
+        ty = 0
+    else:
+        width = xmax - xmin
+        max_width = cell_width * MAX_FILL
+        if width > max_width:
+            scale *= max_width / width
 
-    bounds = glyph_bounds(donor_set, donor_glyph_name, (scale, 0, 0, scale, 0, 0))
-    xmin, ymin, xmax, ymax = bounds
-    tx = (cell_width - (xmax - xmin)) / 2 - xmin
-    ty = y_center - ((ymin + ymax) / 2)
+        bounds = glyph_bounds(donor_set, donor_glyph_name, (scale, 0, 0, scale, 0, 0))
+        xmin, ymin, xmax, ymax = bounds
+        advance = cell_width
+        lsb = 0
+        tx = (cell_width - (xmax - xmin)) / 2 - xmin
+        ty = y_center - ((ymin + ymax) / 2)
 
     glyph = draw_decomposed_glyph(
         donor_set,
@@ -139,7 +150,7 @@ def import_glyph(
     if glyph.numberOfContours == 0 and not glyph.isComposite():
         return None
     base["glyf"][new_name] = glyph
-    base["hmtx"][new_name] = (cell_width, 0)
+    base["hmtx"][new_name] = (advance, lsb)
     return new_name
 
 
@@ -156,6 +167,26 @@ def sync_glyph_order(font: TTFont) -> None:
             order.append(name)
             seen.add(name)
     font.setGlyphOrder(order)
+
+
+def sanitize_glyph_flags(font: TTFont) -> int:
+    """Clear reserved bits in TrueType glyph flags (OTS rejects bit 6/7)."""
+    fixed = 0
+    for glyph_name in font.getGlyphOrder():
+        glyph = font["glyf"][glyph_name]
+        if glyph.numberOfContours <= 0 or not hasattr(glyph, "flags"):
+            continue
+        new_flags = bytearray()
+        changed = False
+        for flag in glyph.flags:
+            cleaned = flag & 0x3F
+            if cleaned != flag:
+                changed = True
+            new_flags.append(cleaned)
+        if changed:
+            glyph.flags = new_flags
+            fixed += 1
+    return fixed
 
 
 def normalize_existing_metrics(font: TTFont, cell_width: int) -> None:

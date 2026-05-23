@@ -12,6 +12,19 @@ import "./App.css";
 
 const textsToReplace: [string | RegExp, string][] = [["+-", "±"]];
 
+const FONT_VARIANTS = {
+  "custom-berkeley": {
+    label: "Custom Berkeley",
+    stack: "'Typehere Mono New', monospace",
+  },
+  "custom-jetbrains": {
+    label: "Custom JetBrains",
+    stack: "'Typehere Mono Old', monospace",
+  },
+} as const;
+
+type FontVariant = keyof typeof FONT_VARIANTS;
+
 interface Snippet {
   name: string;
   description: string;
@@ -341,6 +354,25 @@ function usePersistentState<T extends string | number | boolean | object | null>
             return note;
           });
           value = migratedNotes as T;
+        }
+
+        if (storageKey === "typehere-font-variant" && typeof value === "string") {
+          const legacyMap: Record<string, FontVariant> = {
+            new: "custom-berkeley",
+            old: "custom-jetbrains",
+            "raw-berkeley": "custom-berkeley",
+            "raw-jetbrains": "custom-jetbrains",
+          };
+          const mapped =
+            legacyMap[value] ??
+            (value in FONT_VARIANTS ? (value as FontVariant) : undefined);
+          if (!mapped) {
+            value = defaultValue;
+            await setInDB(storageKey, value);
+          } else if (mapped !== value) {
+            value = mapped as T;
+            await setInDB(storageKey, value);
+          }
         }
 
         if (isMounted) {
@@ -933,6 +965,10 @@ function App() {
   const fileInputDomRef = useRef<HTMLInputElement>(null);
 
   const [currentTheme, setCurrentTheme] = usePersistentState<"light" | "dark">(themeId, "light");
+  const [fontVariant, setFontVariant] = usePersistentState<FontVariant>(
+    "typehere-font-variant",
+    "custom-berkeley"
+  );
   const [selectedCmdKSuggestionIndex, setSelectedCmdKSuggestionIndex] = useState<number>(0);
   const [cmdKSearchQuery, setCmdKSearchQuery] = useState("");
   const [isCmdKMenuOpen, setIsCmdKMenuOpen] = useState(false);
@@ -966,6 +1002,22 @@ function App() {
       document.documentElement.setAttribute("data-theme", "light");
     }
   }, [currentTheme]);
+
+  const editorFontFamily = useMemo(
+    () => FONT_VARIANTS[fontVariant].stack,
+    [fontVariant]
+  );
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-font", fontVariant);
+    document.fonts.ready.then(() => {
+      if (aceEditorRef.current) {
+        const editor = aceEditorRef.current.editor;
+        editor.setOptions({ fontFamily: FONT_VARIANTS[fontVariant].stack });
+        editor.renderer.updateFull();
+      }
+    });
+  }, [fontVariant]);
 
   const moveNoteToWorkspace = (note: Note, workspace?: string) => {
     note.workspace = workspace;
@@ -1889,7 +1941,7 @@ function App() {
               wrap: true,
               highlightActiveLine: false,
               showPrintMargin: false,
-              fontFamily: "'Typehere Mono', 'Berkeley Mono', 'JetBrains Mono', monospace",
+              fontFamily: editorFontFamily,
             }}
             fontSize="1rem"
             onCursorChange={(e) => {
@@ -2021,6 +2073,21 @@ function App() {
               </>,
               document.body
             )}
+          <select
+            className="font-select"
+            value={fontVariant}
+            onChange={(e) => setFontVariant(e.target.value as FontVariant)}
+            aria-label="Editor font"
+            title="Editor font"
+          >
+            {(Object.entries(FONT_VARIANTS) as [FontVariant, (typeof FONT_VARIANTS)[FontVariant]][]).map(
+              ([value, { label }]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              )
+            )}
+          </select>
           <button
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();

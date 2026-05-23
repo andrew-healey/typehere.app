@@ -34,3 +34,6 @@ scripts/__pycache__/
 scripts/measure-*.mjs
 scripts/repro-*
 assets/font-*.png
+
+# Berkeley Mono Trial (local repro only; licensing)
+public/BerkeleyMonoTrial-Regular.otf

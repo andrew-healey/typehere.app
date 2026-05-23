@@ -30,17 +30,43 @@ import_glyph = _merge.import_glyph
 merge_fonts = _merge.merge_fonts
 normalize_existing_metrics = _merge.normalize_existing_metrics
 reference_y_center = _merge.reference_y_center
+sanitize_glyph_flags = _merge.sanitize_glyph_flags
 set_name = _merge.set_name
 sync_glyph_order = _merge.sync_glyph_order
 
 DEFAULT_BERKELEY = Path.home() / (
     "Downloads/berkeley-mono/2605231KV334Q57Z/TX-02-Z2XX0Q57/BerkeleyMonoTrial-Regular.otf"
 )
-DEFAULT_SYMBOLS = Path(__file__).resolve().parents[1] / "public/TypehereMono-Regular.ttf"
+DEFAULT_SYMBOLS = Path(__file__).resolve().parents[1] / "public/TypehereMono-Regular-old.ttf"
 DEFAULT_JB = Path("/tmp/JetBrainsMono-Regular.ttf")
 DEFAULT_APPLE = Path("/System/Library/Fonts/Apple Symbols.ttf")
 DEFAULT_OUT = Path.home() / "Library/Fonts/TypehereMono-Regular.ttf"
 DEFAULT_PUBLIC = Path(__file__).resolve().parents[1] / "public/TypehereMono-Regular.ttf"
+
+# After Berkeley overlay: exchange outlines at these codepoints (cmap only).
+GLYPH_SWAPS: tuple[tuple[int, int], ...] = (
+    (0x002F, 0x005C),  # / ↔ \
+    (0x002A, 0x0023),  # * ↔ #
+)
+
+
+def swap_cmap_codepoints(font: TTFont, codepoint_a: int, codepoint_b: int) -> bool:
+    cmap = font.getBestCmap()
+    if codepoint_a not in cmap or codepoint_b not in cmap:
+        return False
+    glyph_a = cmap[codepoint_a]
+    glyph_b = cmap[codepoint_b]
+    add_cmap_entry(font, codepoint_a, glyph_b)
+    add_cmap_entry(font, codepoint_b, glyph_a)
+    return True
+
+
+def apply_glyph_swaps(font: TTFont) -> list[tuple[int, int]]:
+    swapped: list[tuple[int, int]] = []
+    for codepoint_a, codepoint_b in GLYPH_SWAPS:
+        if swap_cmap_codepoints(font, codepoint_a, codepoint_b):
+            swapped.append((codepoint_a, codepoint_b))
+    return swapped
 
 
 def resolve_symbols_font(
@@ -93,6 +119,7 @@ def merge_berkeley_trial(
             cell_width,
             upm_scale,
             y_center,
+            preserve_donor_metrics=True,
         )
         if not new_name:
             skipped += 1
@@ -101,7 +128,9 @@ def merge_berkeley_trial(
         add_cmap_entry(base, codepoint, new_name)
         replaced += 1
 
-    normalize_existing_metrics(base, cell_width)
+    swapped_codepoints = apply_glyph_swaps(base)
+
+    sanitized_flags = sanitize_glyph_flags(base)
     sync_glyph_order(base)
     set_name(base, family_name, "Regular")
 
@@ -119,6 +148,8 @@ def merge_berkeley_trial(
         "cell_width": cell_width,
         "replaced_ascii": replaced,
         "skipped_ascii": skipped,
+        "swapped_codepoints": swapped_codepoints,
+        "sanitized_flags": sanitized_flags,
         "total_glyphs": len(base.getGlyphOrder()),
         "total_codepoints": len(base.getBestCmap()),
     }
@@ -156,6 +187,12 @@ def main() -> None:
     print(f"Cell width: {stats['cell_width']}")
     print(f"Replaced ASCII glyphs: {stats['replaced_ascii']}")
     print(f"Skipped ASCII codepoints: {stats['skipped_ascii']}")
+    if stats["swapped_codepoints"]:
+        pairs = ", ".join(
+            f"U+{a:04X}↔U+{b:04X}" for a, b in stats["swapped_codepoints"]
+        )
+        print(f"Swapped cmap codepoints: {pairs}")
+    print(f"Sanitized glyph flags: {stats['sanitized_flags']}")
     print(f"Total glyphs: {stats['total_glyphs']}")
     print(f"Total mapped codepoints: {stats['total_codepoints']}")
 

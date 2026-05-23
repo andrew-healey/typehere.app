@@ -1,23 +1,38 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
-
 @font-face {
-  font-family: 'Typehere Mono';
+  font-family: 'Typehere Mono New';
   src: url('/TypehereMono-Regular.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Typehere Mono Old';
+  src: url('/TypehereMono-Regular-old.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root,
+:root[data-font='custom-berkeley'] {
+  --typehere-font-stack: 'Typehere Mono New', monospace;
+}
+
+:root[data-font='custom-jetbrains'] {
+  --typehere-font-stack: 'Typehere Mono Old', monospace;
+}
+
 * {
   padding: 0px;
   margin: 0px;
   box-sizing: border-box;
-  font-family: 'Typehere Mono', 'Berkeley Mono', 'JetBrains Mono', monospace;
+  font-family: var(--typehere-font-stack);
 }
 
 .ace_comment,
 .ace_placeholder {
-  font-family: 'Typehere Mono', 'Berkeley Mono', 'JetBrains Mono', monospace !important;
+  font-family: var(--typehere-font-stack) !important;
   padding: 0px 8px !important;
 }
 
@@ -167,6 +182,27 @@ body.show-scrollbar #controls {
 
 #controls button:hover {
   opacity: 0.8;
+}
+
+#controls select.font-select {
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 2px 2px 2px 4px;
+  color: var(--dark-color);
+  opacity: 0.4;
+  font-size: 0.75rem;
+  max-width: 7.5rem;
+  transition: opacity 0.1s ease;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+#controls select.font-select:hover,
+#controls select.font-select:focus {
+  opacity: 0.8;
+  outline: none;
 }
 
 .notes-list {
