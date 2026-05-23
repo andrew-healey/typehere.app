@@ -84,6 +84,7 @@ def import_glyph(
     y_center: float,
     *,
     preserve_donor_metrics: bool = False,
+    replace_glyph_name: str | None = None,
 ) -> str | None:
     category = unicodedata.category(chr(codepoint))
     if category in SKIP_CATEGORIES:
@@ -93,7 +94,14 @@ def import_glyph(
     if donor_glyph_name not in donor_set:
         return None
 
-    new_name = unique_glyph_name(base, f"uni{codepoint:04X}" if codepoint >= 0x100 else donor_glyph_name)
+    if replace_glyph_name and replace_glyph_name in base.getGlyphSet():
+        # Keep the existing glyph slot so JetBrains GSUB/calt rules still match.
+        new_name = replace_glyph_name
+    else:
+        new_name = unique_glyph_name(
+            base,
+            f"uni{codepoint:04X}" if codepoint >= 0x100 else donor_glyph_name,
+        )
     base_glyph_set = base.getGlyphSet()
 
     if category in COMBINING_CATEGORIES:
@@ -240,16 +248,21 @@ def center_non_ascii_glyphs(
     cell_width: int,
     *,
     ascii_range: tuple[int, int] = (32, 127),
+    only_codepoints: set[int] | frozenset[int] | None = None,
 ) -> int:
     """Horizontally center non-ASCII glyphs in the monospace cell.
 
     Berkeley ASCII (32-126) keeps native sidebearings from the overlay step.
+    JetBrains-native glyphs keep their sidebearings unless listed in
+    ``only_codepoints`` (typically Apple Symbols fill-ins).
     """
     cmap = font.getBestCmap()
     centered = 0
     lo, hi = ascii_range
     for codepoint, glyph_name in sorted(cmap.items()):
         if lo <= codepoint < hi:
+            continue
+        if only_codepoints is not None and codepoint not in only_codepoints:
             continue
         if center_glyph_horizontally(font, glyph_name, cell_width):
             centered += 1
@@ -259,9 +272,9 @@ def center_non_ascii_glyphs(
 def merge_fonts(
     jetbrains_path: Path,
     apple_path: Path,
-    output_path: Path,
+    output_path: Path | None = None,
     family_name: str = "Typehere Mono",
-) -> dict[str, int]:
+) -> tuple[TTFont, dict[str, int | set[int]]]:
     if not jetbrains_path.exists():
         raise FileNotFoundError(f"Missing JetBrains Mono: {jetbrains_path}")
     if not apple_path.exists():
@@ -281,6 +294,7 @@ def merge_fonts(
 
     imported = 0
     skipped = 0
+    apple_codepoints: set[int] = set()
     for codepoint, donor_glyph_name in sorted(donor_cmap.items()):
         if codepoint > 0xFFFF:
             skipped += 1
@@ -303,6 +317,7 @@ def merge_fonts(
             continue
 
         add_cmap_entry(base, codepoint, new_name)
+        apple_codepoints.add(codepoint)
         imported += 1
 
     sync_glyph_order(base)
@@ -311,12 +326,15 @@ def merge_fonts(
     if "DSIG" in base:
         del base["DSIG"]
 
-    base.save(output_path)
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        base.save(output_path)
 
-    return {
+    return base, {
         "cell_width": cell_width,
         "imported": imported,
         "skipped": skipped,
+        "apple_codepoints": apple_codepoints,
         "total_glyphs": len(base.getGlyphOrder()),
         "total_codepoints": len(base.getBestCmap()),
     }
@@ -330,8 +348,7 @@ def main() -> None:
     parser.add_argument("--family-name", default="Typehere Mono")
     args = parser.parse_args()
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    stats = merge_fonts(args.jetbrains, args.apple, args.output, args.family_name)
+    _, stats = merge_fonts(args.jetbrains, args.apple, args.output, args.family_name)
 
     print(f"Wrote {args.output}")
     print(f"Family name: {args.family_name}")
