@@ -29,3 +29,7 @@ release
 dist-cli
 
 scripts/__pycache__/
+
+# Local font repro tooling (Playwright measurement scripts + screenshots)
+scripts/measure-*.mjs
+assets/
