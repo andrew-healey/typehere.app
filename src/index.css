@@ -4,12 +4,12 @@
   padding: 0px;
   margin: 0px;
   box-sizing: border-box;
-  font-family: 'Berkeley Mono', 'JetBrains Mono', monospace;
+  font-family: 'Typehere Mono', 'Berkeley Mono', 'JetBrains Mono', monospace;
 }
 
 .ace_comment,
 .ace_placeholder {
-  font-family: 'Berkeley Mono', 'JetBrains Mono', monospace !important;
+  font-family: 'Typehere Mono', 'Berkeley Mono', 'JetBrains Mono', monospace !important;
   padding: 0px 8px !important;
 }
 

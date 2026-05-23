@@ -10,11 +10,7 @@ import { FiMoreHorizontal } from "react-icons/fi";
 import isElectron from "is-electron";
 import "./App.css";
 
-const textsToReplace: [string | RegExp, string][] = [
-  ["(c)", "©"],
-  ["(r)", "®"],
-  ["+-", "±"],
-];
+const textsToReplace: [string | RegExp, string][] = [["+-", "±"]];
 
 interface Snippet {
   name: string;
@@ -1893,7 +1889,7 @@ function App() {
               wrap: true,
               highlightActiveLine: false,
               showPrintMargin: false,
-              fontFamily: "'Berkeley Mono', 'JetBrains Mono', monospace",
+              fontFamily: "'Typehere Mono', 'Berkeley Mono', 'JetBrains Mono', monospace",
             }}
             fontSize="1rem"
             onCursorChange={(e) => {

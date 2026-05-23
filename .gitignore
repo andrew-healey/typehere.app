@@ -27,3 +27,7 @@ release
 
 # CLI
 dist-cli
+
+# Local font assets (install via scripts/merge-typehere-mono.py)
+public/TypehereMono-Regular.ttf
+scripts/__pycache__/
