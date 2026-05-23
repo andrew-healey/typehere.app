@@ -11,24 +11,27 @@ Local preview only — Berkeley Trial is not licensed for redistribution.
 from __future__ import annotations
 
 import argparse
-import sys
+import importlib.util
 from pathlib import Path
 
 from fontTools.ttLib import TTFont
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
-
-from merge_typehere_mono import (  # noqa: E402
-    add_cmap_entry,
-    import_glyph,
-    merge_fonts,
-    normalize_existing_metrics,
-    reference_y_center,
-    set_name,
-    sync_glyph_order,
+_spec = importlib.util.spec_from_file_location(
+    "merge_typehere_mono",
+    SCRIPT_DIR / "merge-typehere-mono.py",
 )
+_merge = importlib.util.module_from_spec(_spec)
+assert _spec.loader is not None
+_spec.loader.exec_module(_merge)
+
+add_cmap_entry = _merge.add_cmap_entry
+import_glyph = _merge.import_glyph
+merge_fonts = _merge.merge_fonts
+normalize_existing_metrics = _merge.normalize_existing_metrics
+reference_y_center = _merge.reference_y_center
+set_name = _merge.set_name
+sync_glyph_order = _merge.sync_glyph_order
 
 DEFAULT_BERKELEY = Path.home() / (
     "Downloads/berkeley-mono/2605231KV334Q57Z/TX-02-Z2XX0Q57/BerkeleyMonoTrial-Regular.otf"
