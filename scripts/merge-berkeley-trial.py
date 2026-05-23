@@ -26,6 +26,7 @@ assert _spec.loader is not None
 _spec.loader.exec_module(_merge)
 
 add_cmap_entry = _merge.add_cmap_entry
+center_non_ascii_glyphs = _merge.center_non_ascii_glyphs
 import_glyph = _merge.import_glyph
 merge_fonts = _merge.merge_fonts
 normalize_existing_metrics = _merge.normalize_existing_metrics
@@ -130,6 +131,8 @@ def merge_berkeley_trial(
 
     swapped_codepoints = apply_glyph_swaps(base)
 
+    centered_symbols = center_non_ascii_glyphs(base, cell_width)
+
     sanitized_flags = sanitize_glyph_flags(base)
     sync_glyph_order(base)
     set_name(base, family_name, "Regular")
@@ -149,6 +152,7 @@ def merge_berkeley_trial(
         "replaced_ascii": replaced,
         "skipped_ascii": skipped,
         "swapped_codepoints": swapped_codepoints,
+        "centered_symbols": centered_symbols,
         "sanitized_flags": sanitized_flags,
         "total_glyphs": len(base.getGlyphOrder()),
         "total_codepoints": len(base.getBestCmap()),
@@ -192,6 +196,7 @@ def main() -> None:
             f"U+{a:04X}↔U+{b:04X}" for a, b in stats["swapped_codepoints"]
         )
         print(f"Swapped cmap codepoints: {pairs}")
+    print(f"Centered non-ASCII glyphs: {stats['centered_symbols']}")
     print(f"Sanitized glyph flags: {stats['sanitized_flags']}")
     print(f"Total glyphs: {stats['total_glyphs']}")
     print(f"Total mapped codepoints: {stats['total_codepoints']}")

@@ -190,11 +190,70 @@ def sanitize_glyph_flags(font: TTFont) -> int:
 
 
 def normalize_existing_metrics(font: TTFont, cell_width: int) -> None:
+    """Ensure monospace advance width without disturbing native sidebearings.
+
+    Zeroing lsb (as the old version did) shifts JetBrains glyphs left in
+    renderers that honor hmtx, causing wide glyphs like ``>`` and ``→`` to
+    overlap the next character.
+    """
     for glyph_name in font.getGlyphOrder():
-        advance, _ = font["hmtx"][glyph_name]
+        advance, lsb = font["hmtx"][glyph_name]
         if advance == 0:
             continue
-        font["hmtx"][glyph_name] = (cell_width, 0)
+        if advance != cell_width:
+            font["hmtx"][glyph_name] = (cell_width, lsb)
+
+
+def translate_glyph_outline(font: TTFont, glyph_name: str, tx: float, ty: float = 0) -> None:
+    glyph_set = font.getGlyphSet()
+    recording = DecomposingRecordingPen(glyph_set)
+    glyph_set[glyph_name].draw(recording)
+    pen = TTGlyphPen(glyph_set)
+    recording.replay(TransformPen(pen, (1, 0, 0, 1, tx, ty)))
+    font["glyf"][glyph_name] = pen.glyph()
+
+
+def center_glyph_horizontally(font: TTFont, glyph_name: str, cell_width: int) -> bool:
+    """Center a glyph outline in a monospace cell and sync hmtx lsb."""
+    glyph_set = font.getGlyphSet()
+    if glyph_name not in glyph_set:
+        return False
+
+    bounds = glyph_bounds(glyph_set, glyph_name)
+    if not bounds:
+        return False
+
+    xmin, _, xmax, _ = bounds
+    width = xmax - xmin
+    target_lsb = round((cell_width - width) / 2)
+    tx = target_lsb - xmin
+
+    if abs(tx) >= 0.5:
+        translate_glyph_outline(font, glyph_name, tx)
+
+    font["hmtx"][glyph_name] = (cell_width, target_lsb)
+    return True
+
+
+def center_non_ascii_glyphs(
+    font: TTFont,
+    cell_width: int,
+    *,
+    ascii_range: tuple[int, int] = (32, 127),
+) -> int:
+    """Horizontally center non-ASCII glyphs in the monospace cell.
+
+    Berkeley ASCII (32-126) keeps native sidebearings from the overlay step.
+    """
+    cmap = font.getBestCmap()
+    centered = 0
+    lo, hi = ascii_range
+    for codepoint, glyph_name in sorted(cmap.items()):
+        if lo <= codepoint < hi:
+            continue
+        if center_glyph_horizontally(font, glyph_name, cell_width):
+            centered += 1
+    return centered
 
 
 def merge_fonts(
