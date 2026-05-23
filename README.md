@@ -39,3 +39,7 @@ I used to use typehere.co a lot until the site was taken down, so I created [typ
 - Periodically backed up to `indexedDB` (also in your browser)
 - Import/export notes
 - Desktop app (build on own machine)
+
+## Typehere Mono
+
+The UI uses the system font **Typehere Mono** when installed (`font-family` by name; no bundled `.ttf`). Install it with `python scripts/merge-typehere-mono.py` (writes to `~/Library/Fonts/`). Without it, JetBrains Mono from Google Fonts is used.
